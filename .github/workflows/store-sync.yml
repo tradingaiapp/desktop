@@ -1,0 +1,30 @@
+name: Sync Release Link to Microsoft Store
+
+on:
+  release:
+    types: [published] # Triggers automatically when you hit "Publish Release" in your browser
+
+jobs:
+  sync-to-store:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Look through the files you just uploaded to the release and find the .exe link
+      - name: Get Direct EXE URL
+        id: parse_url
+        env:
+          ASSETS: ${{ toJson(github.event.release.assets) }}
+        run: |
+          # Filters the release assets to find the one ending in .exe
+          EXE_URL=$(echo '$ASSETS' | jq -r '.[] | select(.name | endswith(".exe")) | .browser_download_url')
+          echo "Found EXE URL: $EXE_URL"
+          echo "exe_url=$EXE_URL" >> $GITHUB_OUTPUT
+
+      # 2. Safely push that exact URL straight into the Microsoft Store portal
+      - name: Update Microsoft Store Submission
+        uses: microsoft/store-apppublisher@v1
+        with:
+          tenant-id: ${{ secrets.STORE_TENANT_ID }}
+          client-id: ${{ secrets.STORE_CLIENT_ID }}
+          client-secret: ${{ secrets.STORE_CLIENT_SECRET }}
+          product-id: ${{ secrets.STORE_PRODUCT_ID }}
+          package-url: ${{ steps.parse_url.outputs.exe_url }}
